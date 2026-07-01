@@ -1028,13 +1028,20 @@ class Model(ModelSettings):
                         if m.get("name") == target_name:
                             ollama_num_ctx = m.get("context_length")
                             break
-            except Exception:
-                pass
+                if ollama_num_ctx and isinstance(ollama_num_ctx, int) and ollama_num_ctx > 0:
+                    kwargs["num_ctx"] = ollama_num_ctx
+                    # Show success message
+                    from aider.io import io
+                    if io:
+                        io.tool_output(f"Using Ollama VRAM-adjusted context: {ollama_num_ctx} tokens")
+            except Exception as e:
+                # Show fallback warning
+                from aider.io import io
+                if io:
+                    io.tool_warning(f"Falling back to heuristic calculation for Ollama context: {str(e)}")
 
             # Use VRAM-adjusted value if valid, otherwise fall back to heuristic
-            if ollama_num_ctx and isinstance(ollama_num_ctx, int) and ollama_num_ctx > 0:
-                kwargs["num_ctx"] = ollama_num_ctx
-            else:
+            if not ollama_num_ctx or not isinstance(ollama_num_ctx, int) or ollama_num_ctx <= 0:
                 num_ctx = int(self.token_count(messages) * 1.25) + 8192
                 kwargs["num_ctx"] = num_ctx
         key = json.dumps(kwargs, sort_keys=True).encode()
