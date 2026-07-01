@@ -1014,15 +1014,19 @@ class Model(ModelSettings):
             ollama_num_ctx = None
             try:
                 import requests
-                resp = requests.get("http://localhost:11434/api/ps", timeout=2)
+                
+                # Extract configured API base, defaulting to localhost if not set
+                api_base = (self.extra_params or {}).get("api_base", "http://localhost:11434")
+                ps_url = f"{api_base.rstrip('/')}/api/ps"
+                
+                resp = requests.get(ps_url, timeout=2)
                 if resp.status_code == 200:
                     data = resp.json()
                     models = data.get("models", [])
                     target_name = self.name.split("/")[-1]
                     for m in models:
-                        if m.get("name") == target_name or m.get("model") == target_name:
-                            details = m.get("details", {})
-                            ollama_num_ctx = details.get("num_ctx") or m.get("num_ctx")
+                        if m.get("name") == target_name:
+                            ollama_num_ctx = m.get("context_length")
                             break
             except Exception:
                 pass
