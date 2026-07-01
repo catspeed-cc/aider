@@ -1010,8 +1010,29 @@ class Model(ModelSettings):
         if self.extra_params:
             kwargs.update(self.extra_params)
         if self.is_ollama() and "num_ctx" not in kwargs:
-            num_ctx = int(self.token_count(messages) * 1.25) + 8192
-            kwargs["num_ctx"] = num_ctx
+            # Query Ollama's /api/ps for VRAM-adjusted context window of the loaded model
+            ollama_num_ctx = None
+            try:
+                import requests
+                resp = requests.get("http://localhost:11434/api/ps", timeout=2)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    models = data.get("models", [])
+                    target_name = self.name.split("/")[-1]
+                    for m in models:
+                        if m.get("name") == target_name or m.get("model") == target_name:
+                            details = m.get("details", {})
+                            ollama_num_ctx = details.get("num_ctx") or m.get("num_ctx")
+                            break
+            except Exception:
+                pass
+
+            # Use VRAM-adjusted value if valid, otherwise fall back to heuristic
+            if ollama_num_ctx and isinstance(ollama_num_ctx, int) and ollama_num_ctx > 0:
+                kwargs["num_ctx"] = ollama_num_ctx
+            else:
+                num_ctx = int(self.token_count(messages) * 1.25) + 8192
+                kwargs["num_ctx"] = num_ctx
         key = json.dumps(kwargs, sort_keys=True).encode()
 
         # dump(kwargs)
