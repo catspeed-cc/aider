@@ -1031,14 +1031,12 @@ class Model(ModelSettings):
                 if ollama_num_ctx and isinstance(ollama_num_ctx, int) and ollama_num_ctx > 0:
                     kwargs["num_ctx"] = ollama_num_ctx
                     # Show success message
-                    from aider.io import io
-                    if io:
-                        io.tool_output(f"Using Ollama VRAM-adjusted context: {ollama_num_ctx} tokens")
+                    if hasattr(self, 'io'):
+                        self.io.tool_output(f"Using Ollama VRAM-adjusted context: {ollama_num_ctx} tokens")
             except Exception as e:
                 # Show fallback warning
-                from aider.io import io
-                if io:
-                    io.tool_warning(f"Falling back to heuristic calculation for Ollama context: {str(e)}")
+                if hasattr(self, 'io'):
+                    self.io.tool_warning(f"Falling back to heuristic calculation for Ollama context: {str(e)}")
 
             # Use VRAM-adjusted value if valid, otherwise fall back to heuristic
             if not ollama_num_ctx or not isinstance(ollama_num_ctx, int) or ollama_num_ctx <= 0:
