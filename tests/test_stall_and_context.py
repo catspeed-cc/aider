@@ -124,7 +124,8 @@ class TestOllamaContextDetection(unittest.TestCase):
             ]
         }
         
-        with patch("requests.get", return_value=mock_response):
+        # Patch requests.get correctly
+        with patch("requests.get", return_value=mock_response) as mock_get:
             with patch("litellm.completion") as mock_completion:
                 mock_completion.return_value = MagicMock()
                 model.send_completion(messages=[], functions=None, stream=False)
@@ -140,6 +141,7 @@ class TestOllamaContextDetection(unittest.TestCase):
         mock_io = MagicMock()
         model.io = mock_io
         
+        # Patch requests.get correctly
         with patch("requests.get") as mock_get:
             mock_get.side_effect = Exception("API Error")
             with patch("litellm.completion") as mock_completion:
@@ -159,6 +161,7 @@ class TestOllamaContextDetection(unittest.TestCase):
         mock_io = MagicMock()
         model.io = mock_io
         
+        # Patch requests.get correctly
         with patch("requests.get") as mock_get:
             mock_get.side_effect = Exception("API Error")
             with patch("litellm.completion") as mock_completion:
@@ -180,15 +183,14 @@ class TestOllamaContextDetection(unittest.TestCase):
         mock_response = MagicMock()
         mock_response.json.return_value = {"models": []}
         
-        with patch("requests.get", return_value=mock_response):
+        # Patch requests.get correctly
+        with patch("requests.get", return_value=mock_response) as mock_get:
             with patch("litellm.completion") as mock_completion:
                 mock_completion.return_value = MagicMock()
                 model.send_completion(messages=[], functions=None, stream=False)
                 
                 # Assert requests.get was called with correct URL
-                mock_get_call = patch("requests.get").call_args
-                self.assertEqual(mock_get_call[0][0], "http://192.168.1.1:11435/api/ps")
-                self.assertEqual(mock_get_call[1]["timeout"], 2)
+                mock_get.assert_called_once_with("http://192.168.1.1:11435/api/ps", timeout=2)
 
     def test_ollama_context_api_base_default(self):
         """Test default api_base handling"""
@@ -199,14 +201,14 @@ class TestOllamaContextDetection(unittest.TestCase):
         mock_response = MagicMock()
         mock_response.json.return_value = {"models": []}
         
-        with patch("requests.get", return_value=mock_response):
+        # Patch requests.get correctly
+        with patch("requests.get", return_value=mock_response) as mock_get:
             with patch("litellm.completion") as mock_completion:
                 mock_completion.return_value = MagicMock()
                 model.send_completion(messages=[], functions=None, stream=False)
                 
                 # Assert requests.get was called with default URL
-                mock_get_call = patch("requests.get").call_args
-                self.assertEqual(mock_get_call[0][0], "http://localhost:11434/api/ps")
+                mock_get.assert_called_once_with("http://localhost:11434/api/ps", timeout=2)
 
     def test_ollama_context_model_not_found(self):
         """Test handling when model not found in API response"""
@@ -226,7 +228,8 @@ class TestOllamaContextDetection(unittest.TestCase):
             ]
         }
         
-        with patch("requests.get", return_value=mock_response):
+        # Patch requests.get correctly
+        with patch("requests.get", return_value=mock_response) as mock_get:
             with patch("litellm.completion") as mock_completion:
                 mock_completion.return_value = MagicMock()
                 model.send_completion(messages=[], functions=None, stream=False)
@@ -246,7 +249,8 @@ class TestOllamaContextDetection(unittest.TestCase):
         mock_response = MagicMock()
         mock_response.json.return_value = {"models": []}
         
-        with patch("requests.get", return_value=mock_response):
+        # Patch requests.get correctly
+        with patch("requests.get", return_value=mock_response) as mock_get:
             with patch("litellm.completion") as mock_completion:
                 mock_completion.return_value = MagicMock()
                 model.send_completion(messages=[], functions=None, stream=False)
@@ -272,7 +276,8 @@ class TestOllamaContextDetection(unittest.TestCase):
             ]
         }
         
-        with patch("requests.get", return_value=mock_response):
+        # Patch requests.get correctly
+        with patch("requests.get", return_value=mock_response) as mock_get:
             with patch("litellm.completion") as mock_completion:
                 mock_completion.return_value = MagicMock()
                 model.send_completion(messages=[], functions=None, stream=False)
@@ -301,7 +306,8 @@ class TestOllamaContextDetection(unittest.TestCase):
             ]
         }
         
-        with patch("requests.get", return_value=mock_response):
+        # Patch requests.get correctly
+        with patch("requests.get", return_value=mock_response) as mock_get:
             with patch("litellm.completion") as mock_completion:
                 mock_completion.return_value = MagicMock()
                 model.send_completion(messages=[], functions=None, stream=False)
@@ -330,7 +336,8 @@ class TestOllamaContextDetection(unittest.TestCase):
             ]
         }
         
-        with patch("requests.get", return_value=mock_response):
+        # Patch requests.get correctly
+        with patch("requests.get", return_value=mock_response) as mock_get:
             with patch("litellm.completion") as mock_completion:
                 mock_completion.return_value = MagicMock()
                 model.send_completion(messages=[], functions=None, stream=False)
