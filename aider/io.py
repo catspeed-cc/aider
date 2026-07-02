@@ -367,7 +367,7 @@ class InputOutput:
 
         self.file_watcher = file_watcher
         self.root = root
-        
+
         # Instantiate stall detector
         self.stall_detector = OutputStallDetector(self)
 
