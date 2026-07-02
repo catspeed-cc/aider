@@ -367,9 +367,9 @@ class InputOutput:
 
         self.file_watcher = file_watcher
         self.root = root
-
+        
         # Instantiate stall detector
-        self.stall_detector = OutputStallDetector()
+        self.stall_detector = OutputStallDetector(self)
 
         # Validate color settings after console is initialized
         self._validate_color_settings()
