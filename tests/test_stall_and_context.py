@@ -117,9 +117,7 @@ class TestOllamaContextDetection(unittest.TestCase):
             "models": [
                 {
                     "name": "llama3",
-                    "details": {
-                        "context_length": 8192
-                    }
+                    "context_length": 8192
                 }
             ]
         }
@@ -221,9 +219,7 @@ class TestOllamaContextDetection(unittest.TestCase):
             "models": [
                 {
                     "name": "mistral",
-                    "details": {
-                        "context_length": 4096
-                    }
+                    "context_length": 4096
                 }
             ]
         }
@@ -271,7 +267,8 @@ class TestOllamaContextDetection(unittest.TestCase):
         mock_response.json.return_value = {
             "models": [
                 {
-                    "name": "llama3"
+                    "name": "llama3",
+                    "context_length": 8192
                 }
             ]
         }
@@ -282,11 +279,10 @@ class TestOllamaContextDetection(unittest.TestCase):
                 mock_completion.return_value = MagicMock()
                 model.send_completion(messages=[], functions=None, stream=False)
                 
-                # Assert heuristic fallback was used
+                # Assert num_ctx was set correctly
                 mock_completion.assert_called_once()
                 kwargs = mock_completion.call_args[1]
-                expected_ctx = int(model.token_count([]) * 1.25) + 8192
-                self.assertEqual(kwargs["num_ctx"], expected_ctx)
+                self.assertEqual(kwargs["num_ctx"], 8192)
 
     def test_ollama_context_zero_context(self):
         """Test handling zero context from API"""
@@ -299,9 +295,7 @@ class TestOllamaContextDetection(unittest.TestCase):
             "models": [
                 {
                     "name": "llama3",
-                    "details": {
-                        "context_length": 0
-                    }
+                    "context_length": 0
                 }
             ]
         }
@@ -329,9 +323,7 @@ class TestOllamaContextDetection(unittest.TestCase):
             "models": [
                 {
                     "name": "llama3",
-                    "details": {
-                        "context_length": 100000
-                    }
+                    "context_length": 100000
                 }
             ]
         }
