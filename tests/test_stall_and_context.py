@@ -105,5 +105,237 @@ class TestDiffPartialUpdate(unittest.TestCase):
         self.assertIsInstance(result, str)
 
 
-if __name__ == '__main__':
-    unittest.main()
+class TestOllamaContextDetection(unittest.TestCase):
+    def test_ollama_context_from_api(self):
+        """Test getting context from Ollama API"""
+        model = Model("ollama/llama3")
+        mock_io = MagicMock()
+        model.io = mock_io
+        
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "models": [
+                {
+                    "name": "llama3",
+                    "details": {
+                        "context_length": 8192
+                    }
+                }
+            ]
+        }
+        
+        with patch("aider.models.requests.get", return_value=mock_response):
+            with patch("litellm.completion") as mock_completion:
+                mock_completion.return_value = MagicMock()
+                model.send_completion(messages=[], functions=None, stream=False)
+                
+                # Assert num_ctx was set correctly
+                mock_completion.assert_called_once()
+                kwargs = mock_completion.call_args[1]
+                self.assertEqual(kwargs["num_ctx"], 8192)
+
+    def test_ollama_context_heuristic_fallback(self):
+        """Test heuristic fallback when API fails"""
+        model = Model("ollama/llama3")
+        mock_io = MagicMock()
+        model.io = mock_io
+        
+        with patch("aider.models.requests.get") as mock_get:
+            mock_get.side_effect = Exception("API Error")
+            with patch("litellm.completion") as mock_completion:
+                mock_completion.return_value = MagicMock()
+                model.send_completion(messages=[], functions=None, stream=False)
+                
+                # Assert heuristic fallback was used
+                mock_completion.assert_called_once()
+                kwargs = mock_completion.call_args[1]
+                expected_ctx = int(model.token_count([]) * 1.25) + 8192
+                self.assertEqual(kwargs["num_ctx"], expected_ctx)
+                mock_io.tool_warning.assert_called_with(unittest.mock.ANY)
+
+    def test_ollama_context_heuristic_fallback_message(self):
+        """Test heuristic fallback warning message"""
+        model = Model("ollama/llama3")
+        mock_io = MagicMock()
+        model.io = mock_io
+        
+        with patch("aider.models.requests.get") as mock_get:
+            mock_get.side_effect = Exception("API Error")
+            with patch("litellm.completion") as mock_completion:
+                mock_completion.return_value = MagicMock()
+                model.send_completion(messages=[], functions=None, stream=False)
+                
+                # Assert warning message starts correctly
+                mock_io.tool_warning.assert_called()
+                warning_msg = mock_io.tool_warning.call_args[0][0]
+                self.assertTrue(warning_msg.startswith("Falling back to heuristic calculation for Ollama context:"))
+
+    def test_ollama_context_api_base_custom(self):
+        """Test custom api_base handling"""
+        model = Model("ollama/llama3")
+        mock_io = MagicMock()
+        model.io = mock_io
+        model.extra_params = {"api_base": "http://192.168.1.1:11435"}
+        
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"models": []}
+        
+        with patch("aider.models.requests.get", return_value=mock_response):
+            with patch("litellm.completion") as mock_completion:
+                mock_completion.return_value = MagicMock()
+                model.send_completion(messages=[], functions=None, stream=False)
+                
+                # Assert requests.get was called with correct URL
+                mock_get_call = patch("aider.models.requests.get").call_args
+                self.assertEqual(mock_get_call[0][0], "http://192.168.1.1:11435/api/ps")
+                self.assertEqual(mock_get_call[1]["timeout"], 2)
+
+    def test_ollama_context_api_base_default(self):
+        """Test default api_base handling"""
+        model = Model("ollama/llama3")
+        mock_io = MagicMock()
+        model.io = mock_io
+        
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"models": []}
+        
+        with patch("aider.models.requests.get", return_value=mock_response):
+            with patch("litellm.completion") as mock_completion:
+                mock_completion.return_value = MagicMock()
+                model.send_completion(messages=[], functions=None, stream=False)
+                
+                # Assert requests.get was called with default URL
+                mock_get_call = patch("aider.models.requests.get").call_args
+                self.assertEqual(mock_get_call[0][0], "http://localhost:11434/api/ps")
+
+    def test_ollama_context_model_not_found(self):
+        """Test handling when model not found in API response"""
+        model = Model("ollama/llama3")
+        mock_io = MagicMock()
+        model.io = mock_io
+        
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "models": [
+                {
+                    "name": "mistral",
+                    "details": {
+                        "context_length": 4096
+                    }
+                }
+            ]
+        }
+        
+        with patch("aider.models.requests.get", return_value=mock_response):
+            with patch("litellm.completion") as mock_completion:
+                mock_completion.return_value = MagicMock()
+                model.send_completion(messages=[], functions=None, stream=False)
+                
+                # Assert heuristic fallback was used
+                mock_completion.assert_called_once()
+                kwargs = mock_completion.call_args[1]
+                expected_ctx = int(model.token_count([]) * 1.25) + 8192
+                self.assertEqual(kwargs["num_ctx"], expected_ctx)
+
+    def test_ollama_context_empty_response(self):
+        """Test handling empty API response"""
+        model = Model("ollama/llama3")
+        mock_io = MagicMock()
+        model.io = mock_io
+        
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"models": []}
+        
+        with patch("aider.models.requests.get", return_value=mock_response):
+            with patch("litellm.completion") as mock_completion:
+                mock_completion.return_value = MagicMock()
+                model.send_completion(messages=[], functions=None, stream=False)
+                
+                # Assert heuristic fallback was used
+                mock_completion.assert_called_once()
+                kwargs = mock_completion.call_args[1]
+                expected_ctx = int(model.token_count([]) * 1.25) + 8192
+                self.assertEqual(kwargs["num_ctx"], expected_ctx)
+
+    def test_ollama_context_no_details(self):
+        """Test handling missing details in API response"""
+        model = Model("ollama/llama3")
+        mock_io = MagicMock()
+        model.io = mock_io
+        
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "models": [
+                {
+                    "name": "llama3"
+                }
+            ]
+        }
+        
+        with patch("aider.models.requests.get", return_value=mock_response):
+            with patch("litellm.completion") as mock_completion:
+                mock_completion.return_value = MagicMock()
+                model.send_completion(messages=[], functions=None, stream=False)
+                
+                # Assert heuristic fallback was used
+                mock_completion.assert_called_once()
+                kwargs = mock_completion.call_args[1]
+                expected_ctx = int(model.token_count([]) * 1.25) + 8192
+                self.assertEqual(kwargs["num_ctx"], expected_ctx)
+
+    def test_ollama_context_zero_context(self):
+        """Test handling zero context from API"""
+        model = Model("ollama/llama3")
+        mock_io = MagicMock()
+        model.io = mock_io
+        
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "models": [
+                {
+                    "name": "llama3",
+                    "details": {
+                        "context_length": 0
+                    }
+                }
+            ]
+        }
+        
+        with patch("aider.models.requests.get", return_value=mock_response):
+            with patch("litellm.completion") as mock_completion:
+                mock_completion.return_value = MagicMock()
+                model.send_completion(messages=[], functions=None, stream=False)
+                
+                # Assert heuristic fallback was used
+                mock_completion.assert_called_once()
+                kwargs = mock_completion.call_args[1]
+                expected_ctx = int(model.token_count([]) * 1.25) + 8192
+                self.assertEqual(kwargs["num_ctx"], expected_ctx)
+
+    def test_ollama_context_large_context(self):
+        """Test handling large context from API"""
+        model = Model("ollama/llama3")
+        mock_io = MagicMock()
+        model.io = mock_io
+        
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "models": [
+                {
+                    "name": "llama3",
+                    "details": {
+                        "context_length": 100000
+                    }
+                }
+            ]
+        }
+        
+        with patch("aider.models.requests.get", return_value=mock_response):
+            with patch("litellm.completion") as mock_completion:
+                mock_completion.return_value = MagicMock()
+                model.send_completion(messages=[], functions=None, stream=False)
+                
+                # Assert num_ctx was set correctly
+                mock_completion.assert_called_once()
+                kwargs = mock_completion.call_args[1]
+                self.assertEqual(kwargs["num_ctx"], 100000)
