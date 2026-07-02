@@ -295,7 +295,7 @@ def match_but_for_leading_whitespace(whole_lines, part_lines):
     return add.pop()
 
 
-def replace_closest_edit_distance(whole_lines, part_lines, replace_lines):
+def replace_closest_edit_distance(whole_lines, part, part_lines, replace_lines):
     similarity_thresh = 0.8
 
     max_similarity = 0
