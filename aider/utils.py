@@ -5,6 +5,7 @@ import sys
 import tempfile
 from pathlib import Path
 import threading
+import time
 
 import oslex
 
@@ -15,30 +16,31 @@ IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tiff", ".webp", "
 
 
 class OutputStallDetector:
-    def __init__(self, stall_threshold=5.0):
-        self._last_write_time = 0.0
-        self._is_stalled = False
-        self._stall_threshold = stall_threshold
-        self._lock = threading.Lock()
-
+    DEFAULT_THRESHOLD = 5.0
+    
+    def __init__(self, io, threshold=None):
+        self.io = io
+        self.threshold = threshold or self.DEFAULT_THRESHOLD
+        self._start = None
+        
     def __enter__(self):
-        with self._lock:
-            current_time = time.time()
-            # Check if we're under the stall threshold (less than 5 seconds since last write)
-            if current_time - self._last_write_time < self._stall_threshold:
-                self._is_stalled = True
-            else:
-                self._is_stalled = False
-            return self
-
+        self._start = time.time()
+        return self
+        
     def __exit__(self, exc_type, exc_val, exc_tb):
-        with self._lock:
-            # Update last write time when exiting context
-            self._last_write_time = time.time()
-
-    def get_status(self):
-        with self._lock:
-            return self._is_stalled
+        elapsed = time.time() - self._start
+        if elapsed > self.threshold:
+            self._print_stall_message(elapsed)
+            
+    def check(self):
+        """Check if stall threshold has been exceeded and print message if so."""
+        if self._start is not None:
+            elapsed = time.time() - self._start
+            if elapsed > self.threshold:
+                self._print_stall_message(elapsed)
+    
+    def _print_stall_message(self, elapsed):
+        self.io.tool_output(f"⏳ Still working… ({elapsed:.0f}s elapsed, writing file)")
 
 
 class IgnorantTemporaryDirectory:
