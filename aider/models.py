@@ -1025,7 +1025,8 @@ class Model(ModelSettings):
                     models = data.get("models", [])
                     target_name = self.name.split("/")[-1]
                     for m in models:
-                        if m.get("name") == target_name:
+                        # Check both "name" and "model" fields for model matching
+                        if m.get("name") == target_name or m.get("model") == target_name:
                             ollama_num_ctx = m.get("context_length")
                             break
                 if ollama_num_ctx and isinstance(ollama_num_ctx, int) and ollama_num_ctx > 0:
