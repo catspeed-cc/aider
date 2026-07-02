@@ -1022,13 +1022,23 @@ class Model(ModelSettings):
                 resp = requests.get(ps_url, timeout=2)
                 if resp.status_code == 200:
                     data = resp.json()
-                    models = data.get("models", [])
+                    
+                    # Handle both list and dict formats from /api/ps
+                    models = []
+                    if isinstance(data, list):
+                        models = data
+                    elif isinstance(data, dict) and "models" in data:
+                        models = data["models"]
+                    
                     target_name = self.name.split("/")[-1]
                     for m in models:
                         # Check both "name" and "model" fields for model matching
-                        if m.get("name") == target_name or m.get("model") == target_name:
+                        if (m.get("name") == target_name or 
+                            m.get("model") == target_name or
+                            (isinstance(m, dict) and m.get("name") == target_name)):
                             ollama_num_ctx = m.get("context_length")
                             break
+                
                 if ollama_num_ctx and isinstance(ollama_num_ctx, int) and ollama_num_ctx > 0:
                     kwargs["num_ctx"] = ollama_num_ctx
                     # Show success message
