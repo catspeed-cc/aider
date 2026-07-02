@@ -68,7 +68,9 @@ class EditBlockCoder(Coder):
 
             if new_content:
                 if not dry_run:
-                    self.io.write_text(full_path, new_content)
+                    # Use stall detector context manager
+                    with self.io.stall_detector:
+                        self.io.write_text(full_path, new_content)
                 passed.append(edit)
             else:
                 failed.append(edit)
@@ -293,7 +295,7 @@ def match_but_for_leading_whitespace(whole_lines, part_lines):
     return add.pop()
 
 
-def replace_closest_edit_distance(whole_lines, part, part_lines, replace_lines):
+def replace_closest_edit_distance(whole_lines, part_lines, replace_lines):
     similarity_thresh = 0.8
 
     max_similarity = 0

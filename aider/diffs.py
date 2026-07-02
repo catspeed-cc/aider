@@ -1,5 +1,6 @@
 import difflib
 import sys
+import time
 
 from .dump import dump  # noqa: F401
 
@@ -23,13 +24,15 @@ def main():
         input()
 
 
-def create_progress_bar(percentage):
+def create_progress_bar(percentage, status_suffix=""):
     block = "█"
     empty = "░"
     total_blocks = 30
     filled_blocks = int(total_blocks * percentage // 100)
     empty_blocks = total_blocks - filled_blocks
     bar = block * filled_blocks + empty * empty_blocks
+    if status_suffix:
+        bar += f" {status_suffix}"
     return bar
 
 
@@ -40,7 +43,7 @@ def assert_newlines(lines):
         assert line and line[-1] == "\n", line
 
 
-def diff_partial_update(lines_orig, lines_updated, final=False, fname=None):
+def diff_partial_update(lines_orig, lines_updated, final=False, fname=None, status_suffix=""):
     """
     Given only the first part of an updated file, show the diff while
     ignoring the block of "deleted" lines that are past the end of the
@@ -67,7 +70,7 @@ def diff_partial_update(lines_orig, lines_updated, final=False, fname=None):
         pct = last_non_deleted * 100 / num_orig_lines
     else:
         pct = 50
-    bar = create_progress_bar(pct)
+    bar = create_progress_bar(pct, status_suffix)
     bar = f" {last_non_deleted:3d} / {num_orig_lines:3d} lines [{bar}] {pct:3.0f}%\n"
 
     lines_orig = lines_orig[:last_non_deleted]

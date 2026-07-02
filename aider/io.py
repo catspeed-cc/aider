@@ -37,7 +37,7 @@ from aider.mdstream import MarkdownStream
 
 from .dump import dump  # noqa: F401
 from .editor import pipe_editor
-from .utils import is_image_file
+from .utils import is_image_file, OutputStallDetector
 
 # Constants
 NOTIFICATION_MESSAGE = "Aider is waiting for your input"
@@ -368,6 +368,9 @@ class InputOutput:
         self.file_watcher = file_watcher
         self.root = root
 
+        # Instantiate stall detector
+        self.stall_detector = OutputStallDetector()
+
         # Validate color settings after console is initialized
         self._validate_color_settings()
 
@@ -487,24 +490,26 @@ class InputOutput:
         if self.dry_run:
             return
 
-        delay = initial_delay
-        for attempt in range(max_retries):
-            try:
-                with open(str(filename), "w", encoding=self.encoding, newline=self.newline) as f:
-                    f.write(content)
-                return  # Successfully wrote the file
-            except PermissionError as err:
-                if attempt < max_retries - 1:
-                    time.sleep(delay)
-                    delay *= 2  # Exponential backoff
-                else:
-                    self.tool_error(
-                        f"Unable to write file {filename} after {max_retries} attempts: {err}"
-                    )
+        # Use stall detector context manager
+        with self.stall_detector:
+            delay = initial_delay
+            for attempt in range(max_retries):
+                try:
+                    with open(str(filename), "w", encoding=self.encoding, newline=self.newline) as f:
+                        f.write(content)
+                    return  # Successfully wrote the file
+                except PermissionError as err:
+                    if attempt < max_retries - 1:
+                        time.sleep(delay)
+                        delay *= 2  # Exponential backoff
+                    else:
+                        self.tool_error(
+                            f"Unable to write file {filename} after {max_retries} attempts: {err}"
+                        )
+                        raise
+                except OSError as err:
+                    self.tool_error(f"Unable to write file {filename}: {err}")
                     raise
-            except OSError as err:
-                self.tool_error(f"Unable to write file {filename}: {err}")
-                raise
 
     def rule(self):
         if self.pretty:
