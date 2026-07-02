@@ -24,7 +24,7 @@ def main():
         input()
 
 
-def create_progress_bar(percentage, status_suffix=""):
+def create_progress_bar(percentage, status_suffix=None):
     block = "█"
     empty = "░"
     total_blocks = 30
@@ -43,7 +43,7 @@ def assert_newlines(lines):
         assert line and line[-1] == "\n", line
 
 
-def diff_partial_update(lines_orig, lines_updated, final=False, fname=None, status_suffix=""):
+def diff_partial_update(lines_orig, lines_updated, final=False, fname=None, status_suffix=None):
     """
     Given only the first part of an updated file, show the diff while
     ignoring the block of "deleted" lines that are past the end of the
