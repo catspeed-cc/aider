@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, ANY
 import sys
 import os
 
@@ -113,6 +113,7 @@ class TestOllamaContextDetection(unittest.TestCase):
         model.io = mock_io
         
         mock_response = MagicMock()
+        mock_response.status_code = 200
         mock_response.json.return_value = {
             "models": [
                 {
@@ -151,7 +152,7 @@ class TestOllamaContextDetection(unittest.TestCase):
                 kwargs = mock_completion.call_args[1]
                 expected_ctx = int(model.token_count([]) * 1.25) + 8192
                 self.assertEqual(kwargs["num_ctx"], expected_ctx)
-                mock_io.tool_warning.assert_called_with(unittest.mock.ANY)
+                mock_io.tool_warning.assert_called_with(ANY)
 
     def test_ollama_context_heuristic_fallback_message(self):
         """Test heuristic fallback warning message"""
@@ -179,6 +180,7 @@ class TestOllamaContextDetection(unittest.TestCase):
         model.extra_params = {"api_base": "http://192.168.1.1:11435"}
         
         mock_response = MagicMock()
+        mock_response.status_code = 200
         mock_response.json.return_value = {"models": []}
         
         # Patch requests.get correctly
@@ -197,6 +199,7 @@ class TestOllamaContextDetection(unittest.TestCase):
         model.io = mock_io
         
         mock_response = MagicMock()
+        mock_response.status_code = 200
         mock_response.json.return_value = {"models": []}
         
         # Patch requests.get correctly
@@ -215,6 +218,7 @@ class TestOllamaContextDetection(unittest.TestCase):
         model.io = mock_io
         
         mock_response = MagicMock()
+        mock_response.status_code = 200
         mock_response.json.return_value = {
             "models": [
                 {
@@ -243,6 +247,7 @@ class TestOllamaContextDetection(unittest.TestCase):
         model.io = mock_io
         
         mock_response = MagicMock()
+        mock_response.status_code = 200
         mock_response.json.return_value = {"models": []}
         
         # Patch requests.get correctly
@@ -264,6 +269,7 @@ class TestOllamaContextDetection(unittest.TestCase):
         model.io = mock_io
         
         mock_response = MagicMock()
+        mock_response.status_code = 200
         mock_response.json.return_value = {
             "models": [
                 {
@@ -291,6 +297,7 @@ class TestOllamaContextDetection(unittest.TestCase):
         model.io = mock_io
         
         mock_response = MagicMock()
+        mock_response.status_code = 200
         mock_response.json.return_value = {
             "models": [
                 {
@@ -319,6 +326,7 @@ class TestOllamaContextDetection(unittest.TestCase):
         model.io = mock_io
         
         mock_response = MagicMock()
+        mock_response.status_code = 200
         mock_response.json.return_value = {
             "models": [
                 {
