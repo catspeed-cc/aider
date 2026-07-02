@@ -1029,28 +1029,42 @@ class Model(ModelSettings):
                         models = data
                     elif isinstance(data, dict) and "models" in data:
                         models = data["models"]
+                    else:
+                        # If neither list nor dict with "models", try direct dict
+                        models = [data] if isinstance(data, dict) else []
                     
                     target_name = self.name.split("/")[-1]
                     for m in models:
                         # Check both "name" and "model" fields for model matching
-                        if (m.get("name") == target_name or 
-                            m.get("model") == target_name or
-                            (isinstance(m, dict) and m.get("name") == target_name)):
-                            ollama_num_ctx = m.get("context_length")
-                            break
+                        if (isinstance(m, dict) and 
+                            (m.get("name") == target_name or 
+                             m.get("model") == target_name)):
+                            context_length = m.get("context_length")
+                            if context_length is not None:
+                                # Convert to int if it's a string
+                                if isinstance(context_length, str):
+                                    try:
+                                        context_length = int(context_length)
+                                    except ValueError:
+                                        continue  # Skip invalid values
+                                # Only assign if it's a valid positive integer
+                                if isinstance(context_length, int) and context_length > 0:
+                                    ollama_num_ctx = context_length
+                                    break
                 
-                if ollama_num_ctx and isinstance(ollama_num_ctx, int) and ollama_num_ctx > 0:
+                # If we found a valid context length, use it; otherwise let fallback logic handle it
+                if ollama_num_ctx is not None:
                     kwargs["num_ctx"] = ollama_num_ctx
                     # Show success message
                     if hasattr(self, 'io'):
                         self.io.tool_output(f"Using Ollama VRAM-adjusted context: {ollama_num_ctx} tokens")
             except Exception as e:
-                # Show fallback warning
+                # If API call fails, let the fallback logic handle it
                 if hasattr(self, 'io'):
                     self.io.tool_warning(f"Falling back to heuristic calculation for Ollama context: {str(e)}")
 
             # Use VRAM-adjusted value if valid, otherwise fall back to heuristic
-            if not ollama_num_ctx or not isinstance(ollama_num_ctx, int) or ollama_num_ctx <= 0:
+            if ollama_num_ctx is None:
                 num_ctx = int(self.token_count(messages) * 1.25) + 8192
                 kwargs["num_ctx"] = num_ctx
         key = json.dumps(kwargs, sort_keys=True).encode()
