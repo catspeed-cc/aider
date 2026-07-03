@@ -22,14 +22,18 @@ class OutputStallDetector:
         self.io = io
         self.threshold = threshold or self.DEFAULT_THRESHOLD
         self._start = None
+        self._last_message_time = None
+        self._stall_printed = False
         
     def __enter__(self):
         self._start = time.time()
+        self._last_message_time = self._start
+        self._stall_printed = False
         return self
         
     def __exit__(self, exc_type, exc_val, exc_tb):
         elapsed = time.time() - self._start
-        if elapsed > self.threshold:
+        if elapsed > self.threshold and not self._stall_printed:
             self._print_stall_message(elapsed)
             
     def check(self):
@@ -37,7 +41,13 @@ class OutputStallDetector:
         if self._start is not None:
             elapsed = time.time() - self._start
             if elapsed > self.threshold:
-                self._print_stall_message(elapsed)
+                # Only show message if it's been a while since last message
+                now = time.time()
+                if not self._last_message_time or (now - self._last_message_time) > self.threshold:
+                    if not self._stall_printed:
+                        self._print_stall_message(elapsed)
+                        self._last_message_time = now
+                        self._stall_printed = True
     
     def _print_stall_message(self, elapsed):
         self.io.tool_output(f"⏳ Still working… ({elapsed:.0f}s elapsed, writing file)")
