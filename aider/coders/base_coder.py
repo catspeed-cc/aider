@@ -1955,9 +1955,12 @@ class Coder:
                 self.partial_response_content += text
 
             if received_content:
-                # Check for stall condition
+                # Check for stall condition - this was the fix needed
                 with utils.OutputStallDetector(self.io):
                     pass
+
+            # Reset flag for next iteration
+            received_content = False
 
         self.partial_response_content = self.get_multi_response_content_in_progress()
 
