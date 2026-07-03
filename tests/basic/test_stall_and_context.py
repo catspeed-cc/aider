@@ -117,6 +117,95 @@ class TestOutputStallDetector(unittest.TestCase):
         # Should not have called tool_output since it was hidden
         mock_io.tool_output.assert_not_called()
 
+    def test_thread_safety(self):
+        """Test that the detector is thread-safe"""
+        mock_io = MagicMock()
+        
+        # Create multiple threads that will all access the same detector
+        import threading
+        
+        def check_detector(detector):
+            time.sleep(0.1)  # Sleep to ensure we exceed threshold
+            detector.check()
+            
+        detector = OutputStallDetector(mock_io, threshold=0.05)
+        
+        # Start multiple threads
+        threads = []
+        for i in range(5):
+            t = threading.Thread(target=check_detector, args=(detector,))
+            threads.append(t)
+            t.start()
+            
+        # Wait for all threads to complete
+        for t in threads:
+            t.join()
+            
+        # Should have called tool_output exactly once (thread-safe behavior)
+        mock_io.tool_output.assert_called_once()
+
+    def test_custom_format_message(self):
+        """Test custom message formatting"""
+        mock_io = MagicMock()
+        
+        def custom_format(elapsed):
+            return f"Working... {elapsed:.1f}s"
+            
+        with OutputStallDetector(mock_io, threshold=0.1, format_message=custom_format) as detector:
+            time.sleep(0.2)
+            detector.check()
+            
+        mock_io.tool_output.assert_called_with("Working... 0.2s")
+
+    def test_integration_hooks(self):
+        """Test on_stall and on_resume hooks"""
+        mock_io = MagicMock()
+        stall_hook_called = []
+        resume_hook_called = []
+        
+        def on_stall(elapsed):
+            stall_hook_called.append(elapsed)
+            
+        def on_resume():
+            resume_hook_called.append(True)
+            
+        with OutputStallDetector(mock_io, threshold=0.1, on_stall=on_stall, on_resume=on_resume) as detector:
+            time.sleep(0.2)
+            detector.check()
+            
+        # Should have called the stall hook
+        self.assertEqual(len(stall_hook_called), 1)
+        self.assertGreaterEqual(stall_hook_called[0], 0.1)
+        
+        # Reset mock and test resume
+        mock_io.reset_mock()
+        detector.resume()
+        
+        # Should not have called tool_output after resume
+        mock_io.tool_output.assert_not_called()
+        self.assertEqual(len(resume_hook_called), 1)
+
+    def test_resume_method(self):
+        """Test the explicit resume method"""
+        mock_io = MagicMock()
+        
+        with OutputStallDetector(mock_io, threshold=0.1) as detector:
+            time.sleep(0.2)
+            detector.check()  # Should trigger stall
+            
+        # Reset mock
+        mock_io.reset_mock()
+        
+        # Call resume to reset state
+        detector.resume()
+        
+        # Now check again - should trigger again since we've reset the state
+        with OutputStallDetector(mock_io, threshold=0.1) as detector:
+            time.sleep(0.2)
+            detector.check()
+            
+        mock_io.tool_output.assert_called_with("⏳ Still working… (0s elapsed, writing file)")
+
 
 class TestProgressBar(unittest.TestCase):
     def test_create_progress_bar_no_suffix(self):

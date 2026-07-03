@@ -18,48 +18,69 @@ IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tiff", ".webp", "
 class OutputStallDetector:
     DEFAULT_THRESHOLD = 5.0
     
-    def __init__(self, io, threshold=None, visible=True):
+    def __init__(self, io, threshold=None, visible=True, format_message=None, on_stall=None, on_resume=None):
         self.io = io
         self.threshold = threshold or self.DEFAULT_THRESHOLD
         self.visible = visible
         self._start = None
         self._last_message_time = None
         self._stall_printed = False
+        self._lock = threading.Lock()
+        self.format_message = format_message or (lambda elapsed: f"⏳ Still working… ({elapsed:.0f}s elapsed, writing file)")
+        self.on_stall = on_stall
+        self.on_resume = on_resume
         
     def __enter__(self):
-        self._start = time.time()
-        self._last_message_time = self._start
-        self._stall_printed = False
+        with self._lock:
+            self._start = time.time()
+            self._last_message_time = self._start
+            self._stall_printed = False
         return self
         
     def __exit__(self, exc_type, exc_val, exc_tb):
         elapsed = time.time() - self._start
         if elapsed > self.threshold and not self._stall_printed and self.visible:
-            self._print_stall_message(elapsed)
+            with self._lock:
+                self._print_stall_message(elapsed)
+                if self.on_stall:
+                    self.on_stall(elapsed)
             
     def check(self):
         """Check if stall threshold has been exceeded and print message if so."""
-        if self._start is not None and self.visible:
-            elapsed = time.time() - self._start
-            if elapsed > self.threshold:
-                # Only show message if it's been a while since last message
-                now = time.time()
-                if not self._last_message_time or (now - self._last_message_time) > self.threshold:
-                    if not self._stall_printed:
-                        self._print_stall_message(elapsed)
-                        self._last_message_time = now
-                        self._stall_printed = True
+        with self._lock:
+            if self._start is not None and self.visible:
+                elapsed = time.time() - self._start
+                if elapsed > self.threshold:
+                    # Only show message if it's been a while since last message
+                    now = time.time()
+                    if not self._last_message_time or (now - self._last_message_time) > self.threshold:
+                        if not self._stall_printed:
+                            self._print_stall_message(elapsed)
+                            self._last_message_time = now
+                            self._stall_printed = True
+                            if self.on_stall:
+                                self.on_stall(elapsed)
     
     def _print_stall_message(self, elapsed):
-        self.io.tool_output(f"⏳ Still working… ({elapsed:.0f}s elapsed, writing file)")
+        self.io.tool_output(self.format_message(elapsed))
     
     def show(self):
         """Show the stall warning"""
-        self.visible = True
+        with self._lock:
+            self.visible = True
         
     def hide(self):
         """Hide the stall warning"""
-        self.visible = False
+        with self._lock:
+            self.visible = False
+            
+    def resume(self):
+        """Explicitly indicate that work has resumed (resets stall state)"""
+        with self._lock:
+            if self._stall_printed:
+                self._stall_printed = False
+                if self.on_resume:
+                    self.on_resume()
 
 
 class IgnorantTemporaryDirectory:
