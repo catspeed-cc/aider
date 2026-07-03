@@ -18,3 +18,4 @@ venv/
 .gitattributes
 tmp.benchmarks/
 .docker_bash_history
+AIDER_INPUT/
