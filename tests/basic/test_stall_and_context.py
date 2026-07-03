@@ -206,6 +206,29 @@ class TestOutputStallDetector(unittest.TestCase):
             
         mock_io.tool_output.assert_called_with("⏳ Still working… (0s elapsed, writing file)")
 
+    def test_timer_update_in_message(self):
+        """Test that the timer in stall messages updates correctly"""
+        mock_io = MagicMock()
+        
+        # Test with a custom format that shows time
+        def format_with_time(elapsed):
+            return f"⏳ Working... {elapsed:.1f}s elapsed"
+            
+        with OutputStallDetector(mock_io, threshold=0.05, format_message=format_with_time) as detector:
+            # Sleep just under threshold first
+            time.sleep(0.02)
+            detector.check()
+            
+            # Should not have triggered yet
+            mock_io.tool_output.assert_not_called()
+            
+            # Sleep to exceed threshold
+            time.sleep(0.1)
+            detector.check()
+            
+        # Should have called with updated time
+        mock_io.tool_output.assert_called_with("⏳ Working... 0.1s elapsed")
+
 
 class TestProgressBar(unittest.TestCase):
     def test_create_progress_bar_no_suffix(self):
