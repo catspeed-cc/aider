@@ -19,7 +19,6 @@ class TestOutputStallDetector(unittest.TestCase):
         
         with OutputStallDetector(mock_io, threshold=0.1) as detector:
             # Sleep to exceed threshold
-            import time
             time.sleep(0.2)
             detector.check()  # This should trigger the stall message
             
