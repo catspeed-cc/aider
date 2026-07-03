@@ -56,6 +56,67 @@ class TestOutputStallDetector(unittest.TestCase):
         # Assert that the second run triggered at least once, proving it reset cleanly
         self.assertGreaterEqual(mock_io.tool_output.call_count, 1)
 
+    def test_dynamic_visibility_show_hide(self):
+        """Test dynamic visibility control with show() and hide() methods"""
+        mock_io = MagicMock()
+        
+        # Test with visible = False initially
+        with OutputStallDetector(mock_io, threshold=0.1, visible=False) as detector:
+            time.sleep(0.2)
+            detector.check()
+            
+        # Should not have called tool_output since it's hidden
+        mock_io.tool_output.assert_not_called()
+        
+        # Reset mock
+        mock_io.reset_mock()
+        
+        # Test with visible = True initially
+        with OutputStallDetector(mock_io, threshold=0.1, visible=True) as detector:
+            time.sleep(0.2)
+            detector.check()
+            
+        # Should have called tool_output since it's visible
+        mock_io.tool_output.assert_called_with("⏳ Still working… (0s elapsed, writing file)")
+        
+        # Reset mock
+        mock_io.reset_mock()
+        
+        # Test show() method
+        with OutputStallDetector(mock_io, threshold=0.1, visible=False) as detector:
+            time.sleep(0.2)
+            detector.check()  # Should not trigger since it's hidden
+            
+            # Now show it
+            detector.show()
+            detector.check()  # Should now trigger
+            
+        # Should have called tool_output once (after showing)
+        mock_io.tool_output.assert_called_with("⏳ Still working… (0s elapsed, writing file)")
+        
+        # Reset mock
+        mock_io.reset_mock()
+        
+        # Test hide() method
+        with OutputStallDetector(mock_io, threshold=0.1, visible=True) as detector:
+            time.sleep(0.2)
+            detector.check()  # Should trigger
+            
+            # Now hide it
+            detector.hide()
+            detector.check()  # Should not trigger again
+            
+        # Should have called tool_output once (only the first time)
+        mock_io.tool_output.assert_called_once_with("⏳ Still working… (0s elapsed, writing file)")
+        
+        # Test that hide() works in context manager exit
+        mock_io.reset_mock()
+        with OutputStallDetector(mock_io, threshold=0.1, visible=False) as detector:
+            time.sleep(0.2)
+            
+        # Should not have called tool_output since it was hidden
+        mock_io.tool_output.assert_not_called()
+
 
 class TestProgressBar(unittest.TestCase):
     def test_create_progress_bar_no_suffix(self):

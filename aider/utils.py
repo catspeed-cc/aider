@@ -18,9 +18,10 @@ IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tiff", ".webp", "
 class OutputStallDetector:
     DEFAULT_THRESHOLD = 5.0
     
-    def __init__(self, io, threshold=None):
+    def __init__(self, io, threshold=None, visible=True):
         self.io = io
         self.threshold = threshold or self.DEFAULT_THRESHOLD
+        self.visible = visible
         self._start = None
         self._last_message_time = None
         self._stall_printed = False
@@ -33,12 +34,12 @@ class OutputStallDetector:
         
     def __exit__(self, exc_type, exc_val, exc_tb):
         elapsed = time.time() - self._start
-        if elapsed > self.threshold and not self._stall_printed:
+        if elapsed > self.threshold and not self._stall_printed and self.visible:
             self._print_stall_message(elapsed)
             
     def check(self):
         """Check if stall threshold has been exceeded and print message if so."""
-        if self._start is not None:
+        if self._start is not None and self.visible:
             elapsed = time.time() - self._start
             if elapsed > self.threshold:
                 # Only show message if it's been a while since last message
@@ -51,6 +52,14 @@ class OutputStallDetector:
     
     def _print_stall_message(self, elapsed):
         self.io.tool_output(f"⏳ Still working… ({elapsed:.0f}s elapsed, writing file)")
+    
+    def show(self):
+        """Show the stall warning"""
+        self.visible = True
+        
+    def hide(self):
+        """Hide the stall warning"""
+        self.visible = False
 
 
 class IgnorantTemporaryDirectory:
@@ -100,6 +109,14 @@ class ChdirTemporaryDirectory(IgnorantTemporaryDirectory):
 
 
 class GitTemporaryDirectory(ChdirTemporaryDirectory):
+    def __init__(self):
+        try:
+            self.cwd = os.getcwd()
+        except FileNotFoundError:
+            self.cwd = None
+
+        super().__init__()
+
     def __enter__(self):
         dname = super().__enter__()
         self.repo = make_repo(dname)
