@@ -17,24 +17,24 @@ IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tiff", ".webp", "
 
 class OutputStallDetector:
     DEFAULT_THRESHOLD = 5.0
-    
+
     def __init__(self, io, threshold=None, visible=True, format_message=None, on_stall=None, on_resume=None):
         self.io = io
         self.threshold = threshold or self.DEFAULT_THRESHOLD
         self.visible = visible
-        self._start = None
+        self._start = time.time()  # ✅ Set at instantiation
         self._last_message_time = None
         self._stall_printed = False
         self._lock = threading.Lock()
         self.format_message = format_message or (lambda elapsed: f"⏳ Still working… ({elapsed:.0f}s elapsed, writing file)")
         self.on_stall = on_stall
         self.on_resume = on_resume
-        
+
     def __enter__(self):
         with self._lock:
-            # Set the start time when entering the context manager
+            # Reset state for fresh context manager usage
             self._start = time.time()
-            self._last_message_time = self._start
+            self._last_message_time = None
             self._stall_printed = False
         return self
         
