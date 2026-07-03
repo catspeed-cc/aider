@@ -39,25 +39,22 @@ class TestOutputStallDetector(unittest.TestCase):
     def test_context_manager_resets_cleanly(self):
         """Test that context manager resets cleanly"""
         mock_io = MagicMock()
-        
+
         # First use
         with OutputStallDetector(mock_io, threshold=0.1) as detector:
-            import time
             time.sleep(0.2)
             detector.check()
-            
-        # Reset mock between uses
+
+        # Reset mock to isolate the second run
         mock_io.reset_mock()
-        
-        # Second use - should work independently
+
+        # Second use - should work independently of the first
         with OutputStallDetector(mock_io, threshold=0.1) as detector:
-            import time
             time.sleep(0.2)
             detector.check()
-            
-        # Should have been called at least twice (once per context manager)
-        # Note: The actual call count may be higher due to background thread firing
-        self.assertGreaterEqual(mock_io.tool_output.call_count, 2)
+
+        # Assert that the second run triggered at least once, proving it reset cleanly
+        self.assertGreaterEqual(mock_io.tool_output.call_count, 1)
 
 
 class TestProgressBar(unittest.TestCase):
