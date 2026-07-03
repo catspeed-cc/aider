@@ -32,22 +32,25 @@ class OutputStallDetector:
         
     def __enter__(self):
         with self._lock:
+            # Set the start time when entering the context manager
             self._start = time.time()
             self._last_message_time = self._start
             self._stall_printed = False
         return self
         
     def __exit__(self, exc_type, exc_val, exc_tb):
-        elapsed = time.time() - self._start
-        if elapsed > self.threshold and not self._stall_printed and self.visible:
-            with self._lock:
-                self._print_stall_message(elapsed)
-                if self.on_stall:
-                    self.on_stall(elapsed)
+        with self._lock:
+            if self._start is not None:
+                elapsed = time.time() - self._start
+                if elapsed > self.threshold and not self._stall_printed and self.visible:
+                    self._print_stall_message(elapsed)
+                    if self.on_stall:
+                        self.on_stall(elapsed)
             
     def check(self):
         """Check if stall threshold has been exceeded and print message if so."""
         with self._lock:
+            # Only proceed if we've entered the context manager (i.e., _start is set)
             if self._start is not None and self.visible:
                 elapsed = time.time() - self._start
                 if elapsed > self.threshold:
