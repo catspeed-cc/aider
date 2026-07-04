@@ -46,6 +46,26 @@ class OutputStallDetector:
                     self._print_stall_message(elapsed)
                     if self.on_stall:
                         self.on_stall(elapsed)
+
+    def start(self):
+        """Reset the stall detection timer to begin a new window."""
+        with self._lock:
+            self._start = time.time()
+            self._last_message_time = None
+            self._stall_printed = False
+        return self
+
+    def stop(self):
+        """Finalize detection, check for stall, and reset state."""
+        with self._lock:
+            if self._start is not None:
+                elapsed = time.time() - self._start
+                if elapsed > self.threshold and not self._stall_printed and self.visible:
+                    self._print_stall_message(elapsed)
+                    if self.on_stall:
+                        self.on_stall(elapsed)
+            # Clear start time to prevent double-checks or stale state
+            self._start = None
             
     def check(self):
         """Check if stall threshold has been exceeded and print message if so."""
