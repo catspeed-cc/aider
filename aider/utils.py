@@ -18,11 +18,11 @@ IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tiff", ".webp", "
 class OutputStallDetector:
     DEFAULT_THRESHOLD = 5.0
 
-    def __init__(self, io, threshold=None, visible=True, format_message=None, on_stall=None, on_resume=None):
+    def __init__(self, io, threshold=None, start=None, visible=True, format_message=None, on_stall=None, on_resume=None):
         self.io = io
         self.threshold = threshold or self.DEFAULT_THRESHOLD
         self.visible = visible
-        self._start = time.time()  # ✅ Set at instantiation
+        self._start = start or time.time()  # ✅ Set at instantiation
         self._last_message_time = None
         self._stall_printed = False
         self._lock = threading.Lock()

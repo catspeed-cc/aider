@@ -1423,7 +1423,7 @@ class Coder:
         self.io.llm_started()
 
         # Initialize stall detector
-        self.stall_detector = OutputStallDetector(timeout=30)
+        self.stall_detector = OutputStallDetector(self.io)
 
         self.cur_messages += [
             dict(role="user", content=inp),
