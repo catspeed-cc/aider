@@ -72,7 +72,7 @@ class OutputStallDetector:
                         self.on_stall(elapsed)
             # Clear start time to prevent double-checks or stale state
             self._start = None
-            
+
     def check(self):
         """Check if stall threshold has been exceeded and print message if so."""
         with self._lock:
@@ -89,20 +89,41 @@ class OutputStallDetector:
                             self._stall_printed = True
                             if self.on_stall:
                                 self.on_stall(elapsed)
-    
+
     def _print_stall_message(self, elapsed):
-        self.io.tool_output(self.format_message(elapsed))
-    
+        # 1. Check if we should print (visible & not already printed)
+        if not self.visible or self._stall_printed:
+            return
+
+        # 2. Check if the stall threshold is actually met
+        if elapsed <= self.threshold:
+            return
+
+        try:
+            # 3. Print the message
+            self.io.tool_output(self.format_message(elapsed))
+
+            # 4. CRITICAL: Mark as printed so we don't fire again
+            self._stall_printed = True
+
+            # 5. Trigger the callback if it exists (for retries)
+            if self.on_stall:
+                self.on_stall(elapsed)
+
+        except Exception:
+            # Swallow errors to prevent crashing on exit
+            pass
+
     def show(self):
         """Show the stall warning"""
         with self._lock:
             self.visible = True
-        
+
     def hide(self):
         """Hide the stall warning"""
         with self._lock:
             self.visible = False
-            
+
     def resume(self):
         """Explicitly indicate that work has resumed (resets stall state)"""
         with self._lock:
@@ -111,16 +132,16 @@ class OutputStallDetector:
                 if self.on_resume:
                     self.on_resume()
 
-   def feed(self, text):
-       with self._lock:
-           now = time.time()
-           if not self._last_message_time or (now - self._last_message_time) > self.threshold:
-               self._last_message_time = now
-               elapsed = now - self._start
-               if elapsed > self.threshold and not self._stall_printed and self.visible:
-                   self._print_stall_message(elapsed)
-                   if self.on_stall:
-                       self.on_stall(elapsed)
+    def feed(self, text):
+        with self._lock:
+            now = time.time()
+            if not self._last_message_time or (now - self._last_message_time) > self.threshold:
+                self._last_message_time = now
+                elapsed = now - self._start
+                if elapsed > self.threshold and not self._stall_printed and self.visible:
+                    self._print_stall_message(elapsed)
+                    if self.on_stall:
+                        self.on_stall(elapsed)
 
 class IgnorantTemporaryDirectory:
     def __init__(self):
