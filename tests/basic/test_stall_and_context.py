@@ -204,25 +204,23 @@ class TestOutputStallDetector(unittest.TestCase):
     def test_resume_method(self):
         """Test the explicit resume method"""
         mock_io = MagicMock()
+        detector = OutputStallDetector(mock_io, threshold=0.1)
 
-        with OutputStallDetector(mock_io, threshold=0.1) as detector:
-            time.sleep(0.2)
-            detector.check()  # Should trigger stall
+        time.sleep(0.2)
+        detector.check()  # Should trigger stall
+        self.assertEqual(mock_io.tool_output.call_count, 1)
 
-        # Reset mock
+        # Reset mock to isolate resume effect
         mock_io.reset_mock()
 
-        # Call resume to reset state
+        # Call resume on the SAME instance to reset state
         detector.resume()
 
         # Now check again - should trigger again since we've reset the state
-        with OutputStallDetector(mock_io, threshold=0.1) as detector:
-            time.sleep(0.2)
-            detector.check()
+        time.sleep(0.2)
+        detector.check()
 
-        mock_io.tool_output.assert_called_with(
-            "⏳ Still working… (0s elapsed, writing file)"
-        )
+        self.assertEqual(mock_io.tool_output.call_count, 1)
 
     def test_timer_update_in_message(self):
         """Test that the timer in stall messages updates correctly"""
