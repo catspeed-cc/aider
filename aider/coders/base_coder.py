@@ -1423,7 +1423,7 @@ class Coder:
         self.io.llm_started()
 
         # Initialize stall detector
-        stall_detector = OutputStallDetector(timeout=30)
+        self.stall_detector = OutputStallDetector(timeout=30)
 
         self.cur_messages += [
             dict(role="user", content=inp),
@@ -1449,7 +1449,7 @@ class Coder:
         else:
             self.mdstream = None
 
-        stall_detector.start()
+        self.stall_detector.start()
 
         retry_delay = 0.125
 
@@ -1524,7 +1524,7 @@ class Coder:
             self._stop_waiting_spinner()
 
             # Stop stall detector
-            stall_detector.stop()
+            self.stall_detector.stop()
 
             self.partial_response_content = self.get_multi_response_content_in_progress(True)
             self.remove_reasoning_content()
@@ -1964,8 +1964,8 @@ class Coder:
             self.partial_response_content += text
             
             # Feed data to stall detector
-            if text:
-                stall_detector.feed(text)
+            if text and hasattr(self, 'stall_detector'):
+                self.stall_detector.feed(text)
 
             if self.show_pretty():
                 self.live_incremental_response(False)
