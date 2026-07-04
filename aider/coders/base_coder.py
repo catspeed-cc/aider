@@ -46,7 +46,7 @@ from aider.reasoning_tags import (
 from aider.repo import ANY_GIT_ERROR, GitRepo
 from aider.repomap import RepoMap
 from aider.run_cmd import run_cmd
-from aider.utils import format_content, format_messages, format_tokens, is_image_file
+from aider.utils import OutputStallDetector, format_content, format_messages, format_tokens, is_image_file
 from aider.waiting import WaitingSpinner
 
 from ..dump import dump  # noqa: F401
@@ -954,7 +954,7 @@ class Coder:
             self.io.tool_error(text)
 
         # Exclude double quotes from the matched URL characters
-        url_pattern = re.compile(r'(https?://[^\s/$.?#].[^\s"]*)')
+        url_pattern = re.compile(r'(https?://[^\s/$.?#].[^\s"]*[^\s,.])')
         urls = list(set(url_pattern.findall(text)))  # Use set to remove duplicates
         for url in urls:
             url = url.rstrip(".',\"}")  # Added } to the characters to strip
@@ -1422,6 +1422,9 @@ class Coder:
         # Notify IO that LLM processing is starting
         self.io.llm_started()
 
+        # Initialize stall detector
+        stall_detector = OutputStallDetector(timeout=30)
+
         self.cur_messages += [
             dict(role="user", content=inp),
         ]
@@ -1445,6 +1448,8 @@ class Coder:
                 self.mdstream = None
         else:
             self.mdstream = None
+
+        stall_detector.start()
 
         retry_delay = 0.125
 
@@ -1517,6 +1522,9 @@ class Coder:
 
             # Ensure any waiting spinner is stopped
             self._stop_waiting_spinner()
+
+            # Stop stall detector
+            stall_detector.stop()
 
             self.partial_response_content = self.get_multi_response_content_in_progress(True)
             self.remove_reasoning_content()
@@ -1954,6 +1962,10 @@ class Coder:
             if received_content:
                 self._stop_waiting_spinner()
             self.partial_response_content += text
+            
+            # Feed data to stall detector
+            if text:
+                stall_detector.feed(text)
 
             if self.show_pretty():
                 self.live_incremental_response(False)
