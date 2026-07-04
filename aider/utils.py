@@ -43,15 +43,14 @@ class OutputStallDetector:
             self._last_message_time = None
             self._stall_printed = False
         return self
-        
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         with self._lock:
             if self._start is not None:
                 elapsed = time.time() - self._start
                 if elapsed > self.threshold and not self._stall_printed and self.visible:
                     self._print_stall_message(elapsed)
-                    if self.on_stall:
-                        self.on_stall(elapsed)
+                    # on_stall is already triggered inside _print_stall_message
 
     def start(self):
         """Reset the stall detection timer to begin a new window."""
@@ -76,19 +75,15 @@ class OutputStallDetector:
     def check(self):
         """Check if stall threshold has been exceeded and print message if so."""
         with self._lock:
-            # Only proceed if we've entered the context manager (i.e., _start is set)
             if self._start is not None and self.visible:
                 elapsed = time.time() - self._start
                 if elapsed > self.threshold:
-                    # Only show message if it's been a while since last message
                     now = time.time()
                     if not self._last_message_time or (now - self._last_message_time) > self.threshold:
                         if not self._stall_printed:
                             self._print_stall_message(elapsed)
                             self._last_message_time = now
-                            self._stall_printed = True
-                            if self.on_stall:
-                                self.on_stall(elapsed)
+                            # _stall_printed is already set inside _print_stall_message
 
     def _print_stall_message(self, elapsed):
         if not self.visible or self._stall_printed:
