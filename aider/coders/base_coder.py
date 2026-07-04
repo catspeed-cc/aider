@@ -1416,6 +1416,24 @@ class Coder:
                 return False
         return True
 
+    def _update_stall_ui(self):
+        """Update live UI indicator based on stall detector state."""
+        if not hasattr(self, 'stall_detector') or not self.stall_detector:
+            return
+
+        if self.stall_detector.is_stalled:
+            elapsed = time.time() - self.stall_detector._start
+            msg = f"⏳ Still working… ({elapsed:.0f}s elapsed)"
+
+            # Prefer dedicated progress bar/spinner if you have one
+            # else fall back to mdstream or plain tool_output
+            if hasattr(self, 'mdstream') and self.mdstream:
+                self.mdstream.update(msg, final=False)
+            else:
+                self.io.tool_output(msg)
+        # When not stalled, we simply stop updating.
+        # The detector's resume() or __exit__ handles cleanup/reset.
+
     def send_message(self, inp):
         self.event("message_send_starting")
 
@@ -1966,6 +1984,7 @@ class Coder:
             # Feed data to stall detector
             if text and hasattr(self, 'stall_detector'):
                 self.stall_detector.feed(text)
+                self._update_stall_ui()
 
             if self.show_pretty():
                 self.live_incremental_response(False)

@@ -30,6 +30,12 @@ class OutputStallDetector:
         self.on_stall = on_stall
         self.on_resume = on_resume
 
+    @property
+    def is_stalled(self):
+        """Public, thread-safe way to check if a stall is currently active."""
+        with self._lock:
+            return self._stall_printed and self.visible
+
     def __enter__(self):
         with self._lock:
             # Reset state for fresh context manager usage
@@ -105,6 +111,16 @@ class OutputStallDetector:
                 if self.on_resume:
                     self.on_resume()
 
+   def feed(self, text):
+       with self._lock:
+           now = time.time()
+           if not self._last_message_time or (now - self._last_message_time) > self.threshold:
+               self._last_message_time = now
+               elapsed = now - self._start
+               if elapsed > self.threshold and not self._stall_printed and self.visible:
+                   self._print_stall_message(elapsed)
+                   if self.on_stall:
+                       self.on_stall(elapsed)
 
 class IgnorantTemporaryDirectory:
     def __init__(self):
