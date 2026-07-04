@@ -210,13 +210,10 @@ class TestOutputStallDetector(unittest.TestCase):
         detector.check()  # Should trigger stall
         self.assertEqual(mock_io.tool_output.call_count, 1)
 
-        # Reset mock to isolate resume effect
         mock_io.reset_mock()
 
-        # Call resume on the SAME instance to reset state
+        # ✅ Resume on the SAME instance before checking again
         detector.resume()
-
-        # Now check again - should trigger again since we've reset the state
         time.sleep(0.2)
         detector.check()
 
@@ -559,7 +556,7 @@ class TestStallDetectorEdgeCases(unittest.TestCase):
         detector = OutputStallDetector(mock_io, threshold=0.05)
 
         def check_detector():
-            time.sleep(0.02)
+            time.sleep(0.06)
             detector.check()
 
         threads = [threading.Thread(target=check_detector) for _ in range(10)]
@@ -685,7 +682,9 @@ class TestIntegrationScenarios(unittest.TestCase):
 
     def test_write_text_retry_integration(self):
         """Verify stall detector doesn't interfere with exponential backoff in write_text."""
-        mock_io = MagicMock()
+        from aider.io import InputOutput  # Import real class
+
+        mock_io = InputOutput()  # ✅ Use real instance, not MagicMock
         mock_io.dry_run = False
         mock_io.encoding = "utf-8"
         mock_io.newline = None
@@ -703,5 +702,4 @@ class TestIntegrationScenarios(unittest.TestCase):
                 "/tmp/test.txt", "content", max_retries=3, initial_delay=0.01
             )
 
-        # Should have retried exactly 3 times and succeeded
         self.assertEqual(call_count[0], 3)

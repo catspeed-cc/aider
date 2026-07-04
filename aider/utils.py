@@ -130,14 +130,12 @@ class OutputStallDetector:
     def feed(self, text):
         with self._lock:
             now = time.time()
-            # Reset timer and stall state when work resumes
-            self._last_message_time = None
+            # Restart the stall detection window
+            self._start = now
+            # Allow future stalls by clearing the printed flag
             self._stall_printed = False
-            elapsed = now - self._start
-            if elapsed > self.threshold and self.visible:
-                self._print_stall_message(elapsed)
-                if self.on_stall:
-                    self.on_stall(elapsed)
+            # Update cooldown tracker to prevent immediate re-firing
+            self._last_message_time = now
 
 class IgnorantTemporaryDirectory:
     def __init__(self):
