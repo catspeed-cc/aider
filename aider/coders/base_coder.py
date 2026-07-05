@@ -46,7 +46,7 @@ from aider.reasoning_tags import (
 from aider.repo import ANY_GIT_ERROR, GitRepo
 from aider.repomap import RepoMap
 from aider.run_cmd import run_cmd
-from aider.utils import format_content, format_messages, format_tokens, is_image_file
+from aider.utils import OutputStallDetector, format_content, format_messages, format_tokens, is_image_file
 from aider.waiting import WaitingSpinner
 
 from ..dump import dump  # noqa: F401
@@ -954,7 +954,7 @@ class Coder:
             self.io.tool_error(text)
 
         # Exclude double quotes from the matched URL characters
-        url_pattern = re.compile(r'(https?://[^\s/$.?#].[^\s"]*)')
+        url_pattern = re.compile(r'(https?://[^\s/$.?#].[^\s"]*[^\s,.])')
         urls = list(set(url_pattern.findall(text)))  # Use set to remove duplicates
         for url in urls:
             url = url.rstrip(".',\"}")  # Added } to the characters to strip
@@ -1416,11 +1416,32 @@ class Coder:
                 return False
         return True
 
+    def _update_stall_ui(self):
+        """Update live UI indicator based on stall detector state."""
+        if not hasattr(self, 'stall_detector') or not self.stall_detector:
+            return
+
+        if self.stall_detector.is_stalled:
+            elapsed = time.time() - self.stall_detector._start
+            msg = f"⏳ Still working… ({elapsed:.0f}s elapsed)"
+
+            # Prefer dedicated progress bar/spinner if you have one
+            # else fall back to mdstream or plain tool_output
+            if hasattr(self, 'mdstream') and self.mdstream:
+                self.mdstream.update(msg, final=False)
+            else:
+                self.io.tool_output(msg)
+        # When not stalled, we simply stop updating.
+        # The detector's resume() or __exit__ handles cleanup/reset.
+
     def send_message(self, inp):
         self.event("message_send_starting")
 
         # Notify IO that LLM processing is starting
         self.io.llm_started()
+
+        # Initialize stall detector
+        self.stall_detector = OutputStallDetector(self.io)
 
         self.cur_messages += [
             dict(role="user", content=inp),
@@ -1445,6 +1466,8 @@ class Coder:
                 self.mdstream = None
         else:
             self.mdstream = None
+
+        self.stall_detector.start()
 
         retry_delay = 0.125
 
@@ -1517,6 +1540,9 @@ class Coder:
 
             # Ensure any waiting spinner is stopped
             self._stop_waiting_spinner()
+
+            # Stop stall detector
+            self.stall_detector.stop()
 
             self.partial_response_content = self.get_multi_response_content_in_progress(True)
             self.remove_reasoning_content()
@@ -1954,6 +1980,11 @@ class Coder:
             if received_content:
                 self._stop_waiting_spinner()
             self.partial_response_content += text
+            
+            # Feed data to stall detector
+            if text and hasattr(self, 'stall_detector'):
+                self.stall_detector.feed(text)
+                self._update_stall_ui()
 
             if self.show_pretty():
                 self.live_incremental_response(False)

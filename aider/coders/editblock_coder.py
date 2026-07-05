@@ -68,7 +68,9 @@ class EditBlockCoder(Coder):
 
             if new_content:
                 if not dry_run:
-                    self.io.write_text(full_path, new_content)
+                    # Use stall detector context manager
+                    with self.io.stall_detector:
+                        self.io.write_text(full_path, new_content)
                 passed.append(edit)
             else:
                 failed.append(edit)

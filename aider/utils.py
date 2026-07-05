@@ -4,6 +4,8 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+import threading
+import time
 
 import oslex
 
@@ -12,6 +14,123 @@ from aider.waiting import Spinner
 
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tiff", ".webp", ".pdf"}
 
+
+class OutputStallDetector:
+    DEFAULT_THRESHOLD = 5.0
+
+    def __init__(self, io, threshold=None, start=None, visible=True, format_message=None, on_stall=None, on_resume=None):
+        self.io = io
+        self.threshold = threshold or self.DEFAULT_THRESHOLD
+        self.visible = visible
+        self._start = start or time.time()  # ✅ Set at instantiation
+        self._last_message_time = None
+        self._stall_printed = False
+        self._lock = threading.Lock()
+        self.format_message = format_message or (lambda elapsed: f"⏳ Still working… ({elapsed:.0f}s elapsed, writing file)")
+        self.on_stall = on_stall
+        self.on_resume = on_resume
+
+    @property
+    def is_stalled(self):
+        """Public, thread-safe way to check if a stall is currently active."""
+        with self._lock:
+            return self._stall_printed and self.visible
+
+    def __enter__(self):
+        with self._lock:
+            # Reset state for fresh context manager usage
+            self._start = time.time()
+            self._last_message_time = None
+            self._stall_printed = False
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        with self._lock:
+            if self._start is not None:
+                elapsed = time.time() - self._start
+                if elapsed > self.threshold and not self._stall_printed and self.visible:
+                    self._print_stall_message(elapsed)
+                    # on_stall is already triggered inside _print_stall_message
+
+    def start(self):
+        """Reset the stall detection timer to begin a new window."""
+        with self._lock:
+            self._start = time.time()
+            self._last_message_time = None
+            self._stall_printed = False
+        return self
+
+    def stop(self):
+        """Finalize detection, check for stall, and reset state."""
+        with self._lock:
+            if self._start is not None:
+                elapsed = time.time() - self._start
+                if elapsed > self.threshold and not self._stall_printed and self.visible:
+                    self._print_stall_message(elapsed)
+                    if self.on_stall:
+                        self.on_stall(elapsed)
+            # Clear start time to prevent double-checks or stale state
+            self._start = None
+
+    def check(self):
+        """Check if stall threshold has been exceeded and print message if so."""
+        with self._lock:
+            if self._start is not None and self.visible:
+                elapsed = time.time() - self._start
+                if elapsed > self.threshold:
+                    now = time.time()
+                    if not self._last_message_time or (now - self._last_message_time) > self.threshold:
+                        if not self._stall_printed:
+                            self._print_stall_message(elapsed)
+                            self._last_message_time = now
+                            # _stall_printed is already set inside _print_stall_message
+
+    def _print_stall_message(self, elapsed):
+        if not self.visible or self._stall_printed:
+            return
+
+        if elapsed <= self.threshold:
+            return
+
+        try:
+            msg = self.format_message(elapsed)
+        except Exception:
+            # Fallback to default message if custom formatter crashes
+            msg = f"⏳ Still working… ({elapsed:.0f}s elapsed, writing file)"
+
+        self.io.tool_output(msg)
+        self._stall_printed = True
+
+        if self.on_stall:
+            self.on_stall(elapsed)
+
+    def show(self):
+        """Show the stall warning"""
+        with self._lock:
+            self.visible = True
+
+    def hide(self):
+        """Hide the stall warning"""
+        with self._lock:
+            self.visible = False
+
+    def resume(self):
+        with self._lock:
+            if self._stall_printed:
+                self._stall_printed = False
+                self._last_message_time = None  # Prevents immediate re-fire cooldown
+                if self.on_resume:
+                    self.on_resume()
+
+    def feed(self, text):
+        with self._lock:
+            now = time.time()
+            # Restart the stall detection window
+            self._start = now
+            # Allow future stalls by clearing the printed flag
+            self._stall_printed = False
+            # Update cooldown tracker to prevent immediate re-firing
+            self._last_message_time = now
 
 class IgnorantTemporaryDirectory:
     def __init__(self):
@@ -60,6 +179,14 @@ class ChdirTemporaryDirectory(IgnorantTemporaryDirectory):
 
 
 class GitTemporaryDirectory(ChdirTemporaryDirectory):
+    def __init__(self):
+        try:
+            self.cwd = os.getcwd()
+        except FileNotFoundError:
+            self.cwd = None
+
+        super().__init__()
+
     def __enter__(self):
         dname = super().__enter__()
         self.repo = make_repo(dname)

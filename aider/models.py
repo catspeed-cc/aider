@@ -1010,8 +1010,63 @@ class Model(ModelSettings):
         if self.extra_params:
             kwargs.update(self.extra_params)
         if self.is_ollama() and "num_ctx" not in kwargs:
-            num_ctx = int(self.token_count(messages) * 1.25) + 8192
-            kwargs["num_ctx"] = num_ctx
+            # Query Ollama's /api/ps for VRAM-adjusted context window of the loaded model
+            ollama_num_ctx = None
+            try:
+                import requests
+                
+                # Extract configured API base, defaulting to localhost if not set
+                api_base = (self.extra_params or {}).get("api_base", "http://localhost:11434")
+                ps_url = f"{api_base.rstrip('/')}/api/ps"
+                
+                resp = requests.get(ps_url, timeout=2)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    
+                    # Handle both list and dict formats from /api/ps
+                    models = []
+                    if isinstance(data, list):
+                        models = data
+                    elif isinstance(data, dict) and "models" in data:
+                        models = data["models"]
+                    else:
+                        # If neither list nor dict with "models", try direct dict
+                        models = [data] if isinstance(data, dict) else []
+                    
+                    target_name = self.name.split("/")[-1]
+                    for m in models:
+                        # Check both "name" and "model" fields for model matching
+                        if (isinstance(m, dict) and 
+                            (m.get("name") == target_name or 
+                             m.get("model") == target_name)):
+                            context_length = m.get("context_length")
+                            if context_length is not None:
+                                # Convert to int if it's a string
+                                if isinstance(context_length, str):
+                                    try:
+                                        context_length = int(context_length)
+                                    except ValueError:
+                                        continue  # Skip invalid values
+                                # Only assign if it's a valid positive integer
+                                if isinstance(context_length, int) and context_length > 0:
+                                    ollama_num_ctx = context_length
+                                    break
+                
+                # If we found a valid context length, use it; otherwise let fallback logic handle it
+                if ollama_num_ctx is not None:
+                    kwargs["num_ctx"] = ollama_num_ctx
+                    # Show success message
+                    if hasattr(self, 'io'):
+                        self.io.tool_output(f"Using Ollama VRAM-adjusted context: {ollama_num_ctx} tokens")
+            except Exception as e:
+                # If API call fails, let the fallback logic handle it
+                if hasattr(self, 'io'):
+                    self.io.tool_warning(f"Falling back to heuristic calculation for Ollama context: {str(e)}")
+
+            # Use VRAM-adjusted value if valid, otherwise fall back to heuristic
+            if ollama_num_ctx is None:
+                num_ctx = int(self.token_count(messages) * 1.25) + 8192
+                kwargs["num_ctx"] = num_ctx
         key = json.dumps(kwargs, sort_keys=True).encode()
 
         # dump(kwargs)
